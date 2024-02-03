@@ -115,7 +115,9 @@ public class SwiftttCamera : UIViewController, CameraProtocol {
 // MARK: - Capture Session Management
 extension SwiftttCamera {
     public func startRunning() {
-        session?.startRunningIfNeeded()
+        DispatchQueue.global(qos: .background).async {
+            self.session?.startRunningIfNeeded()
+        }
     }
 
     public func stopRunning() {
