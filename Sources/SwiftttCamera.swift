@@ -6,7 +6,7 @@ import UIKit
 
 /// Use to create a standard SwiftttCamera.
 /// - Note: The full interface for the SwiftttCamera can be found in CameraProtocol.
-public class SwiftttCamera : UIViewController, CameraProtocol {
+public class SwiftttCamera: UIViewController, CameraProtocol {
     private var deviceOrientation: DeviceOrientation!
     private var focus: Focus!
     private var zoom: Zoom!
@@ -39,12 +39,13 @@ public class SwiftttCamera : UIViewController, CameraProtocol {
     public var gestureView: UIView?
 
     // MARK: - Initializationo
+
     public init() {
         super.init(nibName: nil, bundle: nil)
         commonInit()
     }
 
-    required public init?(coder: NSCoder) {
+    public required init?(coder: NSCoder) {
         super.init(coder: coder)
         commonInit()
     }
@@ -68,13 +69,13 @@ public class SwiftttCamera : UIViewController, CameraProtocol {
         NotificationCenter.default.addObserver(self, selector: #selector(applicationDidEnterBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
     }
 
-
     private func teardownObservers() {
         NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: Lifecycle
-    public override func viewDidLoad() {
+
+    override public func viewDidLoad() {
         super.viewDidLoad()
         insertPreviewLayer()
         let viewForGestures: UIView = gestureView ?? view
@@ -86,33 +87,34 @@ public class SwiftttCamera : UIViewController, CameraProtocol {
         zoom.detectsPinch = handlesZoom
     }
 
-    public override func viewWillAppear(_ animated: Bool) {
+    override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         startRunning()
         insertPreviewLayer()
         setPreviewVideoOrientation()
     }
 
-    public override func viewDidDisappear(_ animated: Bool) {
+    override public func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         stopRunning()
     }
 
-    public override func viewDidLayoutSubviews() {
+    override public func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         previewLayer?.frame = view.layer.bounds
     }
 
-    public override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+    override public var supportedInterfaceOrientations: UIInterfaceOrientationMask {
         return .all
     }
 
-    public override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+    override public func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         setPreviewVideoOrientation()
     }
 }
 
 // MARK: - Capture Session Management
+
 extension SwiftttCamera {
     public func startRunning() {
         DispatchQueue.global(qos: .background).async {
@@ -127,22 +129,26 @@ extension SwiftttCamera {
     private func setUpCaptureSession() {
         guard session == nil else { return }
         #if targetEnvironment(simulator)
-        deviceAuthorized = true
-        handleDeviceAuthorization(deviceAuthorized)
+            deviceAuthorized = true
+            handleDeviceAuthorization(deviceAuthorized)
         #else
-        checkDeviceAuthorization()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] authorized in
-                guard let self = self else { return }
-                self.deviceAuthorized = authorized
-                self.handleDeviceAuthorization(authorized)
-            }
-            .store(in: &cancellables)
+            checkDeviceAuthorization()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] authorized in
+                    guard let self = self else { return }
+                    self.deviceAuthorized = authorized
+                    self.handleDeviceAuthorization(authorized)
+                }
+                .store(in: &cancellables)
         #endif
     }
 
     private func handleDeviceAuthorization(_ authorized: Bool) {
         if authorized {
+            #if targetEnvironment(simulator)
+                return
+            #endif
+            
             session = AVCaptureSession()
             session.setSessionPresetIfPossible(.photo)
             let device: AVCaptureDevice? = AVCaptureDevice.captureDevice(from: cameraDevice) ?? AVCaptureDevice.default(for: .video) // It's nil only in Simulator
@@ -152,13 +158,13 @@ extension SwiftttCamera {
                 device?.setExposureModeIfSupported(.continuousAutoExposure)
                 device?.unlockForConfiguration()
                 #if !targetEnvironment(simulator)
-                let deviceInput: AVCaptureDeviceInput = try  AVCaptureDeviceInput(device: device!)
-                session.addInputIfPossible(deviceInput)
-                switch device!.position {
-                case .back: cameraDevice = .rear
-                case .front: cameraDevice = .front
-                default: break
-                }
+                    let deviceInput: AVCaptureDeviceInput = try AVCaptureDeviceInput(device: device!)
+                    session.addInputIfPossible(deviceInput)
+                    switch device!.position {
+                    case .back: cameraDevice = .rear
+                    case .front: cameraDevice = .front
+                    default: break
+                    }
                 #endif
                 photoOutput = AVCapturePhotoOutput()
                 session.addOutputIfPossible(photoOutput)
@@ -211,13 +217,14 @@ extension SwiftttCamera {
 }
 
 // MARK: - Camera State
+
 extension SwiftttCamera {
     public var isTorchAvailableForCurrentDevice: Bool {
         guard let device = currentCameraDevice() else { return false }
         return device.isTorchModeSupported(.on)
     }
 
-    public static func isTorchAvailable(forCameraDevice cameraDevice:   CameraDevice) -> Bool {
+    public static func isTorchAvailable(forCameraDevice cameraDevice: CameraDevice) -> Bool {
         return AVCaptureDevice.isTorchAvailable(for: cameraDevice)
     }
 
@@ -269,6 +276,7 @@ extension SwiftttCamera {
 }
 
 // MARK: - Photo Capturing
+
 extension SwiftttCamera {
     public var isReadyToCapturePhoto: Bool {
         return !isCapturingImage
@@ -279,31 +287,32 @@ extension SwiftttCamera {
         isCapturingImage = true
         photoCaptureNeedsPreviewRotation = !deviceOrientation.deviceOrientationMatchesInterfaceOrientation
         #if targetEnvironment(simulator)
-        insertPreviewLayer()
-        let fakeImage = UIImage.fakeTestImage()
-        process(cameraPhoto: fakeImage, needsPreviewRotation: photoCaptureNeedsPreviewRotation, previewOrientation: .portrait)
+            insertPreviewLayer()
+            let fakeImage = UIImage.fakeTestImage()
+            process(cameraPhoto: fakeImage, needsPreviewRotation: photoCaptureNeedsPreviewRotation, previewOrientation: .portrait)
         #else
-        guard let videoConnection: AVCaptureConnection = currentCaptureConnection() else { preconditionFailure("videoConnection is nil in physical device") }
-        if videoConnection.isVideoOrientationSupported {
-            videoConnection.videoOrientation = currentCaptureVideoOrientationForDevice()
-        }
-        if videoConnection.isVideoMirroringSupported {
-            videoConnection.isVideoMirrored = cameraDevice == .front
-        }
-        photoCapturePreviewOrientation = currentPreviewDeviceOrientation()
-        let settings: AVCapturePhotoSettings = AVCapturePhotoSettings(format: [
-            AVVideoCodecKey : AVVideoCodecType.jpeg,
-        ])
-        settings.flashMode = cameraFlashMode.captureFlashMode
-        photoOutput.capturePhoto(with: settings, delegate: self)
+            guard let videoConnection: AVCaptureConnection = currentCaptureConnection() else { preconditionFailure("videoConnection is nil in physical device") }
+            if videoConnection.isVideoOrientationSupported {
+                videoConnection.videoOrientation = currentCaptureVideoOrientationForDevice()
+            }
+            if videoConnection.isVideoMirroringSupported {
+                videoConnection.isVideoMirrored = cameraDevice == .front
+            }
+            photoCapturePreviewOrientation = currentPreviewDeviceOrientation()
+            let settings: AVCapturePhotoSettings = AVCapturePhotoSettings(format: [
+                AVVideoCodecKey: AVVideoCodecType.jpeg,
+            ])
+            settings.flashMode = cameraFlashMode.captureFlashMode
+            photoOutput.capturePhoto(with: settings, delegate: self)
         #endif
     }
 }
 
 // MARK: - Photo Processing
+
 extension SwiftttCamera {
     public func process(image: UIImage, withCropRect cropRect: CGRect?, withMaxDimension maxDimension: CGFloat?) {
-        self.process(image: image, withCropRect: cropRect, maxDimension: maxDimension, fromCamera: false, needsPreviewRotation: false, previewOrientation: .unknown)
+        process(image: image, withCropRect: cropRect, maxDimension: maxDimension, fromCamera: false, needsPreviewRotation: false, previewOrientation: .unknown)
     }
 
     public func cancelImageProcessing() {
@@ -312,7 +321,7 @@ extension SwiftttCamera {
 
     private func process(cameraPhoto image: UIImage, needsPreviewRotation: Bool, previewOrientation: UIDeviceOrientation) {
         let cropRect: CGRect? = cropsImageToVisibleAspectRatio ? image.cropRect(fromPreviewLayer: previewLayer) : nil
-        self.process(image: image, withCropRect: cropRect, maxDimension: maxScaledDimension, fromCamera: true, needsPreviewRotation: needsPreviewRotation || !interfaceRotatesWithOrientation, previewOrientation: previewOrientation)
+        process(image: image, withCropRect: cropRect, maxDimension: maxScaledDimension, fromCamera: true, needsPreviewRotation: needsPreviewRotation || !interfaceRotatesWithOrientation, previewOrientation: previewOrientation)
     }
 
     private func process(image: UIImage, withCropRect cropRect: CGRect?, maxDimension: CGFloat?, fromCamera: Bool, needsPreviewRotation: Bool, previewOrientation: UIDeviceOrientation) {
@@ -375,6 +384,7 @@ extension SwiftttCamera {
 }
 
 // MARK: - Observers
+
 extension SwiftttCamera {
     @objc
     private func applicationWillEnterForeground(_ notification: Notification) {
@@ -401,6 +411,7 @@ extension SwiftttCamera {
 }
 
 // MARK: - AV Orientation
+
 extension SwiftttCamera {
     private func setPreviewVideoOrientation() {
         guard let videoConnection: AVCaptureConnection = previewLayer?.connection else { return }
@@ -437,6 +448,7 @@ extension SwiftttCamera {
 }
 
 // MARK: - Camera Permission
+
 extension SwiftttCamera {
     private func checkDeviceAuthorization() -> Future<Bool, Never> {
         return Future { promise in
@@ -448,6 +460,7 @@ extension SwiftttCamera {
 }
 
 // MARK: - CameraDevice
+
 extension SwiftttCamera {
     private func currentCameraDevice() -> AVCaptureDevice? {
         return (session.inputs.last as? AVCaptureDeviceInput)?.device
@@ -474,7 +487,7 @@ extension SwiftttCamera {
     }
 }
 
-extension SwiftttCamera : FocusDelegate {
+extension SwiftttCamera: FocusDelegate {
     func handleTapFocus(atPoint touchPoint: CGPoint) -> Bool {
         guard AVCaptureDevice.isPointFocusAvailable(for: cameraDevice) else { return false }
         let pointOfInterest: CGPoint = focusPointOfInterest(forTouchPoint: touchPoint)
@@ -482,13 +495,13 @@ extension SwiftttCamera : FocusDelegate {
     }
 }
 
-extension SwiftttCamera : ZoomDelegate {
+extension SwiftttCamera: ZoomDelegate {
     func handlePinchZoom(withScale zoomScale: CGFloat) -> Bool {
         return zoom(to: zoomScale) && showsZoomView
     }
 }
 
-extension SwiftttCamera : AVCapturePhotoCaptureDelegate {
+extension SwiftttCamera: AVCapturePhotoCaptureDelegate {
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         guard isCapturingImage else { return }
         guard let imageData: Data = photo.fileDataRepresentation() else { isCapturingImage = false; return }
